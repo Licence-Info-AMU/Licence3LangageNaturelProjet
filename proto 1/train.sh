@@ -11,9 +11,6 @@ file_polarization_neg="word_polarization_neg.txt"
 file_polarization_neu="word_polarization_neu.txt"
 file_polarization_pos="word_polarization_pos.txt"
 file_word_polarity="word_polarity.txt"
-dir_name="train"
-
-eval_reference="eval_test.txt"
 
 
 build_stop_word_sed(){
@@ -32,7 +29,6 @@ build_stop_word_sed(){
 # 	for file_name in $dir_name/*.txt ;do
 # 		sed -i "s/^/ /" ${file_name}
 # 		sed -i "s/$/ /" ${file_name}
-
 # 	done
 # 	for stop_word in `cat $stop_word_file` ;do
 # 		for file_name in $dir_name/*.txt ;do
@@ -46,12 +42,14 @@ build_stop_word_sed(){
 # 		grep -i -F -w -v -f $stop_word_file $file_name
 # 	done
 # }
+
 remove_anoying_thing(){
 	echo "remove_anoying_thing $dir_name"
 	# sed -s -i -e "s/ http[^ \t]*//g;s/ #[^ \t]*//g;s/ @[^ \t]*//g" $dir_name/*.txt			#enlever les url (http) # et citation (@)
 	sed -s -i -e "s/ http[^ \t]*//g" $dir_name/*.txt			#enlever les url (http)
 	sed -s -i -e "s/\.\.\./ /g;s/[][…≠“”¥→⁰°ã©¨€²!\"$%&'()*,./:;«»’<>?\\^_\`{|}~ ]/ /g;s/\([+=-]\)/ \1 /g;s/ [@#] / /g;s/ [0-9][0-9]* / /g;s/ [a-zA-Z] / /g;s/^/ /;s/$/ /;s/  */ /g;s/ $//;s/^ //" $dir_name/*.txt
 }
+
 remove_stop_word(){		#version plus lisible avec pré traitement puis enlevement des stop word puis post traitement puis posttraitement
 	build_stop_word_sed
 	echo "remove_stop_word $dir_name"
@@ -113,10 +111,10 @@ build_word_polarization(){
 }
 
 build_tweet_polarization(){
-	dir_name="dev"
+	dir_name="$1"
 	sed -s -i -e "s/[+=-]//g" $dir_name/*.txt
 	remove_anoying_thing
-	#remove_stop_word
+	remove_stop_word
 	echo "build_tweet_polarization"
 	local file_name
 	for file_name in $dir_name/*.txt ;do
@@ -132,14 +130,16 @@ build_tweet_polarization(){
 				((neg+=word_polarity[0]))
 				((neu+=word_polarity[1]))
 				((pos+=word_polarity[2]))
-			elif [ $tmp -eq 1 ]; then
-				echo -e "polarité ${i,,} inconue"
+			 elif [ $tmp -eq 1 ]; then
+			 	continue
+			# 	echo -e "polarité ${i,,} inconue"
 			else
 				echo "$tmp ${i}$file_name"
 			fi
 		done
-		((neu=neu*9))
-		((neu=neu/10))
+		((neu=neu*100))
+		((neu=neu/100))
+		echo -e "$pos + \t $neg - \t $neu = \t$file_name "
 		if [ $neg -gt $neu ] && [ $neg -gt $pos ] ; then
 			sed -i "s/$/\t${neg}- ${neu}= ${pos}+\t-/" $file_name
 		elif [ $pos -gt $neu ] && [ $pos -gt $neg ] ; then	
@@ -151,22 +151,27 @@ build_tweet_polarization(){
 }
 
 createDevReference(){
+	eval_reference="eval_$1.txt"
 	[ -f $eval_reference ] && rm $eval_reference
-    for f in dev/*.txt; do
-        string=`cat "$f"`
-        if [[ $string == *+  ]];then
-            echo "${f##*/} =" >> $eval_reference
-        elif [[ $string == *=  ]];then
-            echo "${f##*/} =" >> $eval_reference
-        elif [[ $string == *-  ]];then
-            echo "${f##*/} =" >> $eval_reference
-        fi
-    done
+	for f in $1/*.txt; do
+		string=`cat "$f"`
+		if [[ $string == *+  ]];then
+			echo "${f##*/} +" >> $eval_reference
+		elif [[ $string == *=  ]];then
+			echo "${f##*/} =" >> $eval_reference
+		elif [[ $string == *-  ]];then
+			echo "${f##*/} -" >> $eval_reference
+		fi
+	done
 }
 
+./detach.sh dev
+
 #build_word_polarization
-build_tweet_polarization
-createDevReference
+build_tweet_polarization dev
+createDevReference dev
+
+./eval.sh eval_reference_dev.txt eval_dev.txt 
 
 
 exit 0
